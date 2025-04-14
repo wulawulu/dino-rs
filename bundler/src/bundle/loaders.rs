@@ -1,9 +1,6 @@
-use super::modules::CORE_MODULES;
 use super::modules::ModulePath;
 use super::modules::ModuleSource;
-use super::transpilers::Jsx;
 use super::transpilers::TypeScript;
-use super::transpilers::Wasm;
 use anyhow::Result;
 use anyhow::anyhow;
 use anyhow::bail;
@@ -26,7 +23,7 @@ pub trait ModuleLoader {
     fn resolve(&self, base: Option<&str>, specifier: &str) -> Result<ModulePath>;
 }
 
-static EXTENSIONS: &[&str] = &["js", "jsx", "ts", "tsx", "json", "wasm"];
+static EXTENSIONS: &[&str] = &["js", "ts", "json"];
 
 #[derive(Default)]
 pub struct FsModuleLoader;
@@ -140,12 +137,7 @@ impl ModuleLoader for FsModuleLoader {
 
         // Use a preprocessor if necessary.
         match path_extension {
-            "wasm" => Ok(Wasm::parse(&source)),
             "ts" => TypeScript::compile(fname, &source).map_err(|e| anyhow!(e.to_string())),
-            "jsx" => Jsx::compile(fname, &source).map_err(|e| anyhow!(e.to_string())),
-            "tsx" => Jsx::compile(fname, &source)
-                .and_then(|output| TypeScript::compile(fname, &output))
-                .map_err(|e| anyhow!(e.to_string())),
             _ => Ok(source),
         }
     }
@@ -216,39 +208,14 @@ impl ModuleLoader for UrlModuleLoader {
         };
 
         // Use a preprocessor if necessary.
-        let source = match (
-            specifier.ends_with(".wasm"),
-            specifier.ends_with(".jsx"),
-            specifier.ends_with(".ts"),
-            specifier.ends_with(".tsx"),
-        ) {
-            (true, _, _, _) => Wasm::parse(&source),
-            (_, true, _, _) => Jsx::compile(Some(specifier), &source)?,
-            (_, _, true, _) => TypeScript::compile(Some(specifier), &source)?,
-            (_, _, _, true) => Jsx::compile(Some(specifier), &source)
-                .and_then(|output| TypeScript::compile(Some(specifier), &output))?,
-            _ => source,
+        let source = if specifier.ends_with(".ts") {
+            TypeScript::compile(Some(specifier), &source)?
+        } else {
+            source
         };
 
         fs::write(&module_path, &source)?;
 
         Ok(source)
-    }
-}
-
-#[derive(Default)]
-pub struct CoreModuleLoader;
-
-impl ModuleLoader for CoreModuleLoader {
-    fn resolve(&self, _: Option<&str>, specifier: &str) -> Result<ModulePath> {
-        match CORE_MODULES.get(specifier) {
-            Some(_) => Ok(specifier.to_string()),
-            None => bail!(format!("Module not found \"{specifier}\"")),
-        }
-    }
-    fn load(&self, specifier: &str) -> Result<ModuleSource> {
-        // Since any errors will be caught at the resolve stage, we can
-        // go ahead an unwrap the value with no worries.
-        Ok(CORE_MODULES.get(specifier).unwrap().to_string())
     }
 }

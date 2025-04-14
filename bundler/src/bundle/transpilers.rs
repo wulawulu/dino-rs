@@ -25,8 +25,6 @@ use swc_ecma_parser::lexer::Lexer;
 use swc_ecma_transforms_base::fixer::fixer;
 use swc_ecma_transforms_base::hygiene::hygiene;
 use swc_ecma_transforms_base::resolver;
-use swc_ecma_transforms_react::Options;
-use swc_ecma_transforms_react::react;
 use swc_ecma_transforms_typescript::strip;
 
 lazy_static! {
@@ -118,126 +116,6 @@ impl TypeScript {
         let output = format!("{}\n{}", code, source_map);
 
         Ok(output)
-    }
-}
-
-pub struct Jsx;
-
-impl Jsx {
-    /// Compiles JSX code into JavaScript.
-    pub fn compile(filename: Option<&str>, source: &str) -> Result<String> {
-        let globals = Globals::default();
-        let cm: Lrc<SourceMap> = Lrc::new(SourceMap::new(FilePathMapping::empty()));
-        let handler = Handler::with_tty_emitter(ColorConfig::Auto, true, false, Some(cm.clone()));
-        let comments = SingleThreadedComments::default();
-
-        let filename = match filename {
-            Some(filename) => FileName::Custom(filename.into()),
-            None => FileName::Anon,
-        };
-
-        let fm = cm.new_source_file(filename.into(), source.into());
-
-        // NOTE: We're using a TypeScript lexer to parse JSX because it's a super-set
-        // of JavaScript and we also want to support .tsx files.
-
-        let lexer = Lexer::new(
-            Syntax::Typescript(TsSyntax {
-                tsx: true,
-                decorators: true,
-                no_early_errors: true,
-                ..Default::default()
-            }),
-            Default::default(),
-            StringInput::from(&*fm),
-            None,
-        );
-
-        let mut parser = Parser::new_from(lexer);
-
-        let program = match parser
-            .parse_program()
-            .map_err(|e| e.into_diagnostic(&handler).emit())
-        {
-            Ok(module) => module,
-            Err(_) => bail!("JSX compilation failed."),
-        };
-
-        // This is where we're gonna store the JavaScript output.
-        let mut output = vec![];
-        let mut source_map = vec![];
-
-        // Look for the JSX pragma in the source code.
-        // https://www.gatsbyjs.com/blog/2019-08-02-what-is-jsx-pragma/
-
-        let pragma = PRAGMA_REGEX
-            .find_iter(source)
-            .next()
-            .map(|m| m.as_str().to_string().replace("@jsx ", ""));
-
-        GLOBALS.set(&globals, || {
-            // We're gonna apply the following transformations.
-            //
-            // 1. Conduct identifier scope analysis.
-            // 2. Turn JSX into plan JS code.
-            //
-            let unresolved_mark = Mark::new();
-            let top_level_mark = Mark::new();
-
-            let program = program
-                .apply(resolver(unresolved_mark, top_level_mark, true))
-                .apply(react(
-                    cm.clone(),
-                    Some(&comments),
-                    Options {
-                        pragma,
-                        ..Default::default()
-                    },
-                    top_level_mark,
-                    unresolved_mark,
-                ));
-
-            {
-                let mut emitter = Emitter {
-                    cfg: swc_ecma_codegen::Config::default(),
-                    cm: cm.clone(),
-                    comments: None,
-                    wr: JsWriter::new(cm.clone(), "\n", &mut output, Some(&mut source_map)),
-                };
-
-                emitter.emit_program(&program).unwrap();
-            }
-        });
-
-        // Prepare the inline source map comment.
-        let source_map = source_map_to_string(cm, &source_map);
-        let source_map = BASE64_STANDARD.encode(source_map.as_bytes());
-        let source_map = format!(
-            "//# sourceMappingURL=data:application/json;base64,{}",
-            source_map
-        );
-
-        let code = String::from_utf8_lossy(&output).to_string();
-        let output = format!("{}\n{}", code, source_map);
-
-        Ok(output)
-    }
-}
-
-pub struct Wasm;
-
-impl Wasm {
-    // Converts a wasm binary into an ES module template.
-    pub fn parse(source: &str) -> String {
-        format!(
-            "
-        const wasmCode = new Uint8Array({:?});
-        const wasmModule = new WebAssembly.Module(wasmCode);
-        const wasmInstance = new WebAssembly.Instance(wasmModule);
-        export default wasmInstance.exports;
-        ",
-            source.as_bytes()
-        )
     }
 }
 
