@@ -1,6 +1,6 @@
 mod bundle;
 
-pub use bundle::run_bundle;
+pub use bundle::{Options, run_bundle};
 
 #[cfg(test)]
 mod tests {

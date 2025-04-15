@@ -1,0 +1,7 @@
+async function hello(req: Request) :Promise<Response> {
+    return new Response("Hello, World!", {
+        headers: {"Content-Type": "text/plain"},
+    });
+}
+
+export { hello };
