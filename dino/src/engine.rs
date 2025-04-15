@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
 use anyhow::Result;
-use rquickjs::{Context, Ctx, FromJs, Function, IntoJs, Object, Promise, Runtime, Value};
+use dino_macros::{FromJs, IntoJs};
+use rquickjs::{Context, Function, IntoJs, Object, Promise, Runtime};
 use typed_builder::TypedBuilder;
 
 #[allow(unused)]
@@ -10,7 +11,7 @@ pub struct JsWorker {
     ctx: Context,
 }
 
-#[derive(Debug, TypedBuilder)]
+#[derive(Debug, TypedBuilder, IntoJs)]
 pub struct Req {
     pub headers: HashMap<String, String>,
     #[builder(default, setter(strip_option))]
@@ -21,7 +22,7 @@ pub struct Req {
     pub method: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, FromJs)]
 #[allow(unused)]
 pub struct Resp {
     pub status: u16,
@@ -61,35 +62,6 @@ impl JsWorker {
             let v: Promise = fun.call((req,))?;
 
             Ok::<_, anyhow::Error>(v.finish::<Resp>()?)
-        })
-    }
-}
-
-impl<'js> IntoJs<'js> for Req {
-    fn into_js(self, ctx: &Ctx<'js>) -> rquickjs::Result<Value<'js>> {
-        let obj = Object::new(ctx.clone())?;
-
-        obj.set("headers", self.headers)?;
-        obj.set("body", self.body)?;
-        obj.set("url", self.url)?;
-        obj.set("method", self.method)?;
-
-        Ok(obj.into())
-    }
-}
-
-impl<'js> FromJs<'js> for Resp {
-    fn from_js(_ctx: &Ctx<'js>, value: Value<'js>) -> rquickjs::Result<Self> {
-        let obj = value.into_object().unwrap();
-
-        let headers: HashMap<String, String> = obj.get("headers")?;
-        let body: Option<String> = obj.get("body")?;
-        let status: u16 = obj.get("status")?;
-
-        Ok(Self {
-            headers,
-            body,
-            status,
         })
     }
 }
