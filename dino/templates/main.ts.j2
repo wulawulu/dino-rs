@@ -1,7 +1,11 @@
-async function hello(req: Request) :Promise<Response> {
-    return new Response("Hello, World!", {
-        headers: {"Content-Type": "text/plain"},
-    });
-}
+async function hello(req) {
+   return {
+     status: 200,
+     headers: {
+       'Content-Type': 'application/json',
+     },
+     body: JSON.stringify(req),
+   }
+ }
 
 export { hello };

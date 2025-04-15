@@ -1,10 +1,32 @@
+use std::collections::HashMap;
+
 use anyhow::Result;
-use rquickjs::{Context, Function, Object, Runtime};
+use rquickjs::{Context, Ctx, FromJs, Function, IntoJs, Object, Promise, Runtime, Value};
+use typed_builder::TypedBuilder;
 
 #[allow(unused)]
 pub struct JsWorker {
     rt: Runtime,
     ctx: Context,
+}
+
+#[derive(Debug, TypedBuilder)]
+pub struct Req {
+    pub headers: HashMap<String, String>,
+    #[builder(default, setter(strip_option))]
+    pub body: Option<String>,
+    #[builder(setter(into))]
+    pub url: String,
+    #[builder(setter(into))]
+    pub method: String,
+}
+
+#[derive(Debug)]
+#[allow(unused)]
+pub struct Resp {
+    pub status: u16,
+    pub headers: HashMap<String, String>,
+    pub body: Option<String>,
 }
 
 fn print(msg: String) {
@@ -30,13 +52,45 @@ impl JsWorker {
         Ok(Self { rt, ctx })
     }
 
-    pub fn run(&self, code: &str) -> Result<()> {
+    pub fn run(&self, name: &str, req: Req) -> Result<Resp> {
         self.ctx.with(|ctx| {
-            ctx.eval_promise(code)?.finish::<()>()?;
-            Ok::<_, anyhow::Error>(())
-        })?;
+            let global = ctx.globals();
+            let handlers: Object = global.get("handlers")?;
 
-        Ok(())
+            let fun: Function = handlers.get(name)?;
+            let v: Promise = fun.call((req,))?;
+
+            Ok::<_, anyhow::Error>(v.finish::<Resp>()?)
+        })
+    }
+}
+
+impl<'js> IntoJs<'js> for Req {
+    fn into_js(self, ctx: &Ctx<'js>) -> rquickjs::Result<Value<'js>> {
+        let obj = Object::new(ctx.clone())?;
+
+        obj.set("headers", self.headers)?;
+        obj.set("body", self.body)?;
+        obj.set("url", self.url)?;
+        obj.set("method", self.method)?;
+
+        Ok(obj.into())
+    }
+}
+
+impl<'js> FromJs<'js> for Resp {
+    fn from_js(_ctx: &Ctx<'js>, value: Value<'js>) -> rquickjs::Result<Self> {
+        let obj = value.into_object().unwrap();
+
+        let headers: HashMap<String, String> = obj.get("headers")?;
+        let body: Option<String> = obj.get("body")?;
+        let status: u16 = obj.get("status")?;
+
+        Ok(Self {
+            headers,
+            body,
+            status,
+        })
     }
 }
 
@@ -47,9 +101,28 @@ mod tests {
     #[test]
     fn js_worker_should_run() {
         let code = r#"
-     (function(){async function hello(){print("hello world");return"hello";}return{hello:hello};})();
+         (function(){
+         async function hello(req){
+             return {
+                 status:200,
+                 headers:{
+                     "content-type":"application/json"
+                 },
+                 body: JSON.stringify(req),
+             };
+         }
+         return{hello:hello};
+     })();
      "#;
+        let req = Req::builder()
+            .method("GET")
+            .url("https://www.baidu.com")
+            .headers(HashMap::new())
+            .build();
+
         let worker = JsWorker::try_new(code).unwrap();
-        worker.run("await handlers.hello()").unwrap();
+        let resp = worker.run("hello", req).unwrap();
+        println!("{:?}", resp);
+        assert_eq!(resp.status, 200);
     }
 }
