@@ -1,0 +1,23 @@
+[package]
+name = "dino-server"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[dependencies]
+anyhow = "1.0.98"
+arc-swap = "1.7.1"
+axum = { version = "0.8.3", features = ["http2", "macros", "query", "tracing"] }
+axum-extra = { version = "0.10.1", features = ["typed-header"] }
+dashmap = "6.1.0"
+indexmap = { version = "2.9.0", features = ["serde"] }
+matchit = "0.8.4"
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = "0.9.34"
+thiserror = "2.0.12"
+tokio = { workspace = true }
+tracing = "0.1.41"
+
+[dev-dependencies]
+tracing-subscriber = { workspace = true }

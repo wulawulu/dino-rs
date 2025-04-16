@@ -1,7 +1,10 @@
 {
     "cSpell.words": [
         "askama",
+        "dashmap",
         "dialoguer",
-        "rquickjs"
+        "matchit",
+        "rquickjs",
+        "thiserror"
     ]
 }

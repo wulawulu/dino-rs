@@ -16,16 +16,16 @@ lazy_static = "1.5.0"
 path-absolutize = "3.1.1"
 regex = "1.11.1"
 sha = "1.0.3"
-swc_atoms = "3.0.2"
+swc_atoms = "3.1.0"
 swc_bundler = "7.0.0"
-swc_common = { version = "5.0.0", features = ["tty-emitter", "sourcemap"] }
-swc_ecma_ast = "5.0.1"
-swc_ecma_codegen = "5.0.1"
+swc_common = { version = "5.0.1", features = ["tty-emitter", "sourcemap"] }
+swc_ecma_ast = "5.1.0"
+swc_ecma_codegen = "5.1.0"
 swc_ecma_loader = "5.0.0"
-swc_ecma_parser = "6.0.1"
-swc_ecma_transforms_base = "7.0.0"
+swc_ecma_parser = "6.0.2"
+swc_ecma_transforms_base = "7.1.1"
 swc_ecma_transforms_typescript = "7.0.0"
 swc_ecma_transforms_react = "7.0.0"
 ureq = { version = "2.12.1", features = ["charset"] }
 url = "2.5.4"
-serde_json = "1.0.140"
+serde_json = { workspace = true }
