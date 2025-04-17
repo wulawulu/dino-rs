@@ -3,11 +3,11 @@
  routes:
    /api/hello/{id}:
      - method: GET
-       handler: hello1
+       handler: hello2
      - method: POST
        handler: hello2
    /api/{name}/{id}:
      - method: GET
-       handler: handler1
+       handler: handler2
      - method: POST
        handler: handler2

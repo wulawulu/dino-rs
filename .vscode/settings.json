@@ -3,6 +3,7 @@
         "askama",
         "dashmap",
         "dialoguer",
+        "indexmap",
         "matchit",
         "rquickjs",
         "thiserror"

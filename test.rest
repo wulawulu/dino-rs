@@ -2,10 +2,10 @@
 
  ### get hello
 
- GET http://localhost:8888/api/hello/1?name=hello
+ GET http://localhost:8888/api/hello?name=hello
  Content-Type: application/json
 
  {
-     "id": 1,
+     "id": 2,
      "name": "hello"
  }

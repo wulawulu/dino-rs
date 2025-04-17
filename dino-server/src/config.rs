@@ -1,3 +1,6 @@
+use std::path::Path;
+
+use anyhow::{Context, Result};
 use axum::http::Method;
 use indexmap::IndexMap;
 use serde::{Deserialize, Deserializer};
@@ -33,5 +36,13 @@ where
         "CONNECT" => Ok(Method::CONNECT),
         "TRACE" => Ok(Method::TRACE),
         _ => Err(serde::de::Error::custom("Invalid method")),
+    }
+}
+
+impl ProjectConfig {
+    pub fn load(path: impl AsRef<Path>) -> Result<Self> {
+        let config = std::fs::read_to_string(path).context("Failed to read config file")?;
+        let config: ProjectConfig = serde_yaml::from_str(&config)?;
+        Ok(config)
     }
 }

@@ -9,11 +9,14 @@ use crate::config::ProjectRoutes;
 
 #[derive(Clone)]
 pub struct SwappableAppRouter {
-    pub routes: Arc<ArcSwap<Router<MethodRoute>>>,
+    pub routes: Arc<ArcSwap<AppRouter>>,
 }
 
 #[derive(Clone)]
-pub struct AppRouter(Arc<Router<MethodRoute>>);
+pub struct AppRouter {
+    pub routes: Router<MethodRoute>,
+    pub code: String,
+}
 
 #[derive(Debug, Default, Clone)]
 pub struct MethodRoute {
@@ -29,21 +32,30 @@ pub struct MethodRoute {
 }
 
 impl SwappableAppRouter {
-    pub fn try_new(routes: ProjectRoutes) -> Result<Self> {
+    pub fn try_new(code: impl Into<String>, routes: ProjectRoutes) -> Result<Self> {
         let router = Self::get_router(routes)?;
         Ok(Self {
-            routes: Arc::new(ArcSwap::from_pointee(router)),
+            routes: Arc::new(ArcSwap::from_pointee(AppRouter {
+                routes: router,
+                code: code.into(),
+            })),
         })
     }
 
-    pub fn swap(&self, routes: ProjectRoutes) -> Result<()> {
+    pub fn swap(&self, code: impl Into<String>, routes: ProjectRoutes) -> Result<()> {
         let router = Self::get_router(routes)?;
-        self.routes.store(Arc::new(router));
+        self.routes.store(Arc::new(AppRouter {
+            routes: router,
+            code: code.into(),
+        }));
         Ok(())
     }
 
     pub fn load(&self) -> AppRouter {
-        AppRouter(self.routes.load_full())
+        AppRouter {
+            routes: self.routes.load_full().routes.clone(),
+            code: self.routes.load_full().code.clone(),
+        }
     }
 
     fn get_router(routes: ProjectRoutes) -> Result<Router<MethodRoute>> {
@@ -76,7 +88,7 @@ impl AppRouter {
     where
         'p: 'm,
     {
-        let Ok(ret) = self.0.at(path) else {
+        let Ok(ret) = self.routes.at(path) else {
             return Err(anyhow::anyhow!("No route found for path: {}", path));
         };
         let handler = match method {
@@ -107,35 +119,35 @@ mod tests {
 
     #[test]
     fn app_router_match_should_work() {
-        let config = include_str!("../fixtures/config.yml");
-        let config: ProjectConfig = serde_yaml::from_str(config).unwrap();
-        let router = SwappableAppRouter::try_new(config.routes).unwrap();
+        let config: ProjectConfig =
+            ProjectConfig::load("./fixtures/config.yml").expect("cannot find config file");
+        let router = SwappableAppRouter::try_new("", config.routes).unwrap();
         let app_router = router.load();
         let match_result = app_router.match_it(Method::GET, "/api/hello/123").unwrap();
-        assert_eq!(match_result.value, "hello1");
+        assert_eq!(match_result.value, "hello");
         assert_eq!(match_result.params.get("id"), Some("123"));
 
         let match_result = app_router.match_it(Method::POST, "/api/goodbye/2").unwrap();
-        assert_eq!(match_result.value, "hello4");
+        assert_eq!(match_result.value, "hello");
         assert_eq!(match_result.params.get("id"), Some("2"));
         assert_eq!(match_result.params.get("name"), Some("goodbye"));
     }
 
     #[test]
     fn app_router_swap_should_work() {
-        let config = include_str!("../fixtures/config.yml");
-        let config: ProjectConfig = serde_yaml::from_str(config).unwrap();
-        let router = SwappableAppRouter::try_new(config.routes).unwrap();
+        let config: ProjectConfig =
+            ProjectConfig::load("./fixtures/config.yml").expect("cannot find config file");
+        let router = SwappableAppRouter::try_new("", config.routes).unwrap();
         let app_router = router.load();
         let m = app_router.match_it(Method::GET, "/api/hello/1").unwrap();
-        assert_eq!(m.value, "hello1");
+        assert_eq!(m.value, "hello");
 
         let new_config = include_str!("../fixtures/config1.yml");
         let new_config: ProjectConfig = serde_yaml::from_str(new_config).unwrap();
-        router.swap(new_config.routes).unwrap();
+        router.swap("", new_config.routes).unwrap();
         let app_router = router.load();
         let m = app_router.match_it(Method::GET, "/api/hello/1").unwrap();
-        assert_eq!(m.value, "hello1");
+        assert_eq!(m.value, "hello2");
 
         let m = app_router.match_it(Method::POST, "/api/goodbye/2").unwrap();
         assert_eq!(m.value, "handler2");

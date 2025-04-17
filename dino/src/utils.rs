@@ -3,6 +3,7 @@ use bundler::{Options, run_bundle};
 use std::{
     collections::BTreeSet,
     fs::{self, File},
+    io,
     path::{Path, PathBuf},
 };
 
@@ -46,6 +47,11 @@ pub fn build_project(dir: &str) -> Result<String> {
 
     let content = run_bundle("main.ts", &Options::default())?;
     fs::write(dst, content)?;
+
+    let config = format!("{}/{}.yml", BUILD_DIR, hash);
+    let mut dst = File::create(&config)?;
+    let mut src = File::open("config.yml")?;
+    io::copy(&mut src, &mut dst)?;
 
     Ok(filename)
 }
