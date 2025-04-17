@@ -24,6 +24,7 @@ rquickjs = { version = "0.9.0", features = ["full"] }
 rquickjs-macro = "0.9.0"
 oneshot = "0.1.11"
 crossbeam = { version = "0.8.4", features = ["crossbeam-channel"] }
+uuid = { version = "1.16.0", features = ["v4"] }
 
 [dev-dependencies]
 tracing-subscriber = { workspace = true }

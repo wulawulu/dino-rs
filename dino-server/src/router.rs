@@ -7,12 +7,12 @@ use matchit::{Match, Router};
 
 use crate::config::ProjectRoutes;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SwappableAppRouter {
     pub routes: Arc<ArcSwap<AppRouter>>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AppRouter {
     pub routes: Router<MethodRoute>,
     pub code: String,
