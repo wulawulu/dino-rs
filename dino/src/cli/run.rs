@@ -2,12 +2,8 @@ use std::{collections::HashMap, fs};
 
 use clap::Parser;
 
-use crate::{
-    CmdExecutor,
-    engine::{JsWorker, Req},
-    utils::build_project,
-};
-
+use crate::{CmdExecutor, utils::build_project};
+use dino_server::engine::{JsWorker, Req};
 #[derive(Debug, Parser)]
 pub struct RunOpts {}
 

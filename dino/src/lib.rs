@@ -1,7 +1,6 @@
 use cli::*;
 use enum_dispatch::enum_dispatch;
 mod cli;
-mod engine;
 mod utils;
 
 pub use cli::Opts;

@@ -17,6 +17,7 @@ use tokio::net::TcpListener;
 use tracing::info;
 
 mod config;
+pub mod engine;
 mod error;
 mod router;
 

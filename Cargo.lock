@@ -774,15 +774,12 @@ dependencies = [
  "bundler",
  "clap",
  "dialoguer",
- "dino-macros",
+ "dino-server",
  "enum_dispatch",
  "git2",
  "glob",
- "rquickjs",
- "rquickjs-macro",
  "tokio",
  "tracing-subscriber",
- "typed-builder",
 ]
 
 [[package]]
@@ -804,8 +801,11 @@ dependencies = [
  "axum",
  "axum-extra",
  "dashmap 6.1.0",
+ "dino-macros",
  "indexmap",
  "matchit",
+ "rquickjs",
+ "rquickjs-macro",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -813,6 +813,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "typed-builder",
 ]
 
 [[package]]
