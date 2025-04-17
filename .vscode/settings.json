@@ -5,6 +5,7 @@
         "dialoguer",
         "indexmap",
         "matchit",
+        "oneshot",
         "rquickjs",
         "thiserror"
     ]

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, thread};
 
 use anyhow::{Context, Result};
 use axum::{
@@ -10,8 +10,9 @@ use axum::{
     routing::any,
 };
 use axum_extra::extract::Host;
+use crossbeam::channel::Sender;
 use dashmap::DashMap;
-use engine::{JsWorker, Req};
+use engine::{JsWorker, Req, Resp};
 use error::AppError;
 use matchit::Match;
 use router::AppRouter;
@@ -29,6 +30,7 @@ pub use router::SwappableAppRouter;
 #[derive(Clone)]
 pub struct AppState {
     routers: DashMap<String, SwappableAppRouter>,
+    workers: DashMap<String, Sender<WorkerMessage>>,
 }
 
 #[derive(Clone)]
@@ -60,23 +62,21 @@ async fn handler(
     State(state): State<AppState>,
     Query(query): Query<HashMap<String, String>>,
     method: Method,
-    Host(host): Host,
+    Host(mut host): Host,
     uri: Uri,
     body: Bytes,
 ) -> Result<impl IntoResponse, AppError> {
-    let router = get_router(host, &state)?;
+    let _ = host.split_off(host.find(':').unwrap_or(host.len()));
+    let router = get_router(host.clone(), &state)?;
     let matched = router.match_it(method.clone(), uri.path())?;
     let req = assemble_req(query, &matched, method, &uri, body)?;
-    let worker = JsWorker::try_new(&router.code).unwrap();
     let handler = matched.value;
-    let resp = worker.run(handler, req).unwrap();
+    let resp = state.send(host, handler.to_string(), req)?;
 
     Ok(Response::from(resp))
 }
 
-fn get_router(mut host: String, state: &AppState) -> Result<AppRouter> {
-    let _ = host.split_off(host.find(':').unwrap_or(host.len()));
-
+fn get_router(host: String, state: &AppState) -> Result<AppRouter> {
     let router = state
         .routers
         .get(&host)
@@ -115,12 +115,55 @@ fn assemble_req(
 
 impl AppState {
     pub fn new(routers: DashMap<String, SwappableAppRouter>) -> Self {
-        Self { routers }
+        let workers = DashMap::new();
+        for item in &routers {
+            let (send, recv) = crossbeam::channel::unbounded::<WorkerMessage>();
+            let code = item.value().load().code;
+            thread::Builder::new()
+                .name(format!("worker-{}", item.key()))
+                .spawn(move || {
+                    let worker = JsWorker::try_new(&code).context("Failed to create worker")?;
+                    while let Ok(msg) = recv.recv() {
+                        let resp = worker.run(&msg.handler, msg.req)?;
+                        if let Err(e) = msg.send.send(resp) {
+                            eprintln!("Send error: {}", e);
+                        }
+                    }
+                    Ok::<(), anyhow::Error>(())
+                })
+                .unwrap();
+            workers.insert(item.key().to_string(), send);
+        }
+        Self { routers, workers }
+    }
+
+    pub fn send(&self, host: String, handler: String, req: Req) -> Result<Resp> {
+        let send = self.workers.get(&host).context("Worker not found")?;
+        let (msg, recv) = WorkerMessage::new(req, handler);
+        if let Err(e) = send.send(msg) {
+            eprintln!("Send error: {}", e);
+        }
+        let resp = recv.recv()?;
+        Ok(resp)
     }
 }
 
 impl TenantRouter {
     pub fn new(host: String, router: SwappableAppRouter) -> Self {
         Self { host, router }
+    }
+}
+
+#[derive(Debug)]
+struct WorkerMessage {
+    pub req: Req,
+    pub handler: String,
+    pub send: oneshot::Sender<Resp>,
+}
+
+impl WorkerMessage {
+    pub fn new(req: Req, handler: String) -> (Self, oneshot::Receiver<Resp>) {
+        let (send, recv) = oneshot::channel();
+        (Self { req, handler, send }, recv)
     }
 }
